@@ -30,6 +30,7 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: /sgms/
+          VITE_APPS_SCRIPT_URL: ${{ secrets.VITE_APPS_SCRIPT_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

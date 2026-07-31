@@ -26,8 +26,10 @@ jobs:
       - name: Install packages
         run: npm install
 
-      - name: Build Vite app
+       - name: Build Vite app
         run: npm run build
+        env:
+          VITE_BASE_PATH: /sgms/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

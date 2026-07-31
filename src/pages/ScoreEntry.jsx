@@ -26,6 +26,8 @@ import { Save, Loader2, PenTool } from 'lucide-react';
 import { termsAPI, activitiesAPI, studentsAPI, scoresAPI } from '@/api/sgmsAPI';
 import { PageHeader, Loading, EmptyState } from '@/components/PageState';
 import { toast } from 'sonner';
+import QRScanLookupPanel from '@/components/QRScanLookupPanel';
+import StudentGradeDialog from '@/components/StudentGradeDialog';
 
 const ScoreEntry = () => {
   const [terms, setTerms] = useState([]);
@@ -42,6 +44,36 @@ const ScoreEntry = () => {
   const [saving, setSaving] = useState(false);
 
   const [scoreDraft, setScoreDraft] = useState({}); // studentId -> string
+
+  // NEW — QR quick lookup. A scan makes that student the active record and
+  // opens the full profile + grade editor pop-up. Nothing above is affected.
+  const [scannedStudentId, setScannedStudentId] = useState('');
+  const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
+  const [autoSaveScans, setAutoSaveScans] = useState(false);
+
+  const handleStudentScanned = (studentId, student) => {
+    // Replace whatever record is open with the newly scanned student.
+    setScannedStudentId(studentId);
+    setGradeDialogOpen(true);
+    toast.success(`Scanned: ${student?.ENGLISH_NAME || studentId}`);
+  };
+
+  // Keep the class grid in sync when grades are saved from the pop-up.
+  const handleDialogSaved = async () => {
+    if (!selectedActivity) return;
+    const res = await scoresAPI.getAll({ activityId: selectedActivity });
+    if (!res.success) return;
+    const map = {};
+    (res.data || []).forEach((sc) => { map[sc.STUDENT_ID] = sc.RAW_SCORE; });
+    setExistingScores(map);
+    setScoreDraft((prev) => {
+      const next = { ...prev };
+      Object.keys(map).forEach((sid) => {
+        if (next[sid] !== undefined) next[sid] = String(map[sid]);
+      });
+      return next;
+    });
+  };
 
   useEffect(() => {
     (async () => {
@@ -202,6 +234,19 @@ const ScoreEntry = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader title="Score Entry" description="Filter by grade, term, and activity — then enter scores" />
+
+      <QRScanLookupPanel onStudentScanned={handleStudentScanned} />
+
+      <StudentGradeDialog
+        open={gradeDialogOpen}
+        onOpenChange={setGradeDialogOpen}
+        studentId={scannedStudentId}
+        terms={terms}
+        activities={activities}
+        autoSave={autoSaveScans}
+        onAutoSaveChange={setAutoSaveScans}
+        onSaved={handleDialogSaved}
+      />
 
       <Card>
         <CardHeader>

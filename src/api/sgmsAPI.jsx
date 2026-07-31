@@ -226,6 +226,20 @@ export const qrAPI = {
     // FIX: backend expects { sessionId, studentToken } — pass named field correctly
     return await makeRequest('updateQRSession', { sessionId, studentToken }, getToken());
   },
+  /**
+   * NEW (continuous scanning): keeps a scanning session alive while the
+   * scanner device's page is open. Public endpoint — no token needed.
+   */
+  heartbeat: async (sessionId) => {
+    return await makeRequest('heartbeatQRSession', { sessionId });
+  },
+  /**
+   * NEW: ends a scanning session — sent by the scanner device when its page
+   * closes, and by the main device when the teacher stops scanning.
+   */
+  closeSession: async (sessionId) => {
+    return await makeRequest('closeQRSession', { sessionId });
+  },
 };
 
 // ── Reports ───────────────────────────────────────────────────────────────────
@@ -271,9 +285,11 @@ export const importExportAPI = {
   exportStudents: async (filters = {}) => {
     return await makeRequest('exportStudents', filters, getToken());
   },
-  importScores: async (scores) => {
+  importScores: async (scores, activityId = '') => {
     // FIX: backend reads payload.scores, not payload.csvData.
-    return await makeRequest('importScores', { scores }, getToken());
+    // activityId is a fallback for rows that leave ACTIVITY_ID blank — the
+    // generated template always fills it in, but hand-edited sheets may not.
+    return await makeRequest('importScores', { scores, activityId }, getToken());
   },
 };
 

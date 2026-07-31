@@ -249,6 +249,12 @@ export const importExportAPI = {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 export const settingsAPI = {
+
+   // Load system settings
+  getAll: async () => {
+    return await makeRequest('getSettings', {}, getToken());
+  },
+  
   get: async () => {
     return await makeRequest('getSettings', {}, getToken());
   },

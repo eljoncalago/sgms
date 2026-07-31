@@ -1,3 +1,13 @@
+/**
+ * Activities.jsx — Manage grading terms and activities
+ *
+ * FIX / NEW: Grade-level specific activities.
+ *   Each activity now has an optional GRADE_LEVEL field (blank = all grades).
+ *   When creating an activity you can assign it to a specific grade level so
+ *   that different grade levels have independent activity sets.
+ *   The activity list shows a grade level filter so you see only activities
+ *   for the grade you're working on.
+ */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,13 +37,23 @@ import { PageHeader, Loading, EmptyState } from '@/components/PageState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
 
-const emptyActivityForm = { activityName: '', activityType: 'General', maxScore: '' };
+const GRADE_LEVELS = ['All Grades', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
+const emptyActivityForm = {
+  activityName: '',
+  activityType: 'General',
+  maxScore: '',
+  gradeLevel: '', // '' means all grades
+};
 
 const Activities = () => {
   const [terms, setTerms] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTerm, setActiveTerm] = useState('');
+
+  // Grade level filter for the activity list
+  const [gradeFilter, setGradeFilter] = useState(''); // '' = All Grades
 
   // Activity create/edit
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -82,11 +102,22 @@ const Activities = () => {
     setTermEdits(edits);
   }, [terms]);
 
-  const termActivities = activities.filter((a) => a.TERM_ID === activeTerm);
+  /**
+   * Filter activities by:
+   * 1. Active term tab
+   * 2. Grade level (if gradeFilter is set, show activities for that grade
+   *    OR activities with no grade level assigned — all-grade activities always show)
+   */
+  const termActivities = activities.filter((a) => {
+    if (a.TERM_ID !== activeTerm) return false;
+    if (!gradeFilter) return true; // "All Grades" selected — show everything
+    const actGrade = String(a.GRADE_LEVEL || '').trim();
+    return actGrade === '' || actGrade === gradeFilter;
+  });
 
   const openCreateActivity = () => {
     setEditingActivity(null);
-    setActForm(emptyActivityForm);
+    setActForm({ ...emptyActivityForm, gradeLevel: gradeFilter });
     setDialogOpen(true);
   };
 
@@ -96,6 +127,7 @@ const Activities = () => {
       activityName: a.ACTIVITY_NAME || '',
       activityType: a.ACTIVITY_TYPE || 'General',
       maxScore: String(a.MAX_SCORE ?? ''),
+      gradeLevel: String(a.GRADE_LEVEL || ''),
     });
     setDialogOpen(true);
   };
@@ -112,13 +144,15 @@ const Activities = () => {
     }
     setSavingAct(true);
     const payload = {
+      termId: activeTerm,
       activityName: actForm.activityName.trim(),
       activityType: actForm.activityType.trim() || 'General',
       maxScore: Number(actForm.maxScore),
+      gradeLevel: actForm.gradeLevel.trim() || '', // '' = applies to all grades
     };
     const result = editingActivity
       ? await activitiesAPI.update(editingActivity.ACTIVITY_ID, payload)
-      : await activitiesAPI.create({ termId: activeTerm, ...payload });
+      : await activitiesAPI.create(payload);
     setSavingAct(false);
     if (result.success) {
       toast.success(editingActivity ? 'Activity updated' : 'Activity created');
@@ -156,7 +190,12 @@ const Activities = () => {
       setTerms((prev) =>
         prev.map((t) =>
           t.TERM_ID === termId
-            ? { ...t, TERM_NAME: ed.termName, WEIGHT_PERCENT: Number(ed.weight), PASSING_PERCENT: Number(ed.passingPercent) }
+            ? {
+                ...t,
+                TERM_NAME: ed.termName,
+                WEIGHT_PERCENT: Number(ed.weight),
+                PASSING_PERCENT: Number(ed.passingPercent),
+              }
             : t
         )
       );
@@ -183,7 +222,7 @@ const Activities = () => {
     <div className="p-4 md:p-6 space-y-6">
       <PageHeader
         title="Activities & Grading Terms"
-        description="Configure term weights and manage activities"
+        description="Configure term weights and manage activities per grade level"
       />
 
       {/* Grading Terms */}
@@ -195,7 +234,11 @@ const Activities = () => {
           {loading ? (
             <Loading label="Loading terms…" />
           ) : terms.length === 0 ? (
-            <EmptyState icon={ClipboardList} title="No grading terms" description="Run initializeSystem in Apps Script to create default terms." />
+            <EmptyState
+              icon={ClipboardList}
+              title="No grading terms"
+              description="Run initializeSystem in Apps Script to create default terms."
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -241,7 +284,11 @@ const Activities = () => {
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => saveTerm(t.TERM_ID)} disabled={savingTermId === t.TERM_ID}>
+                          <Button
+                            size="sm"
+                            onClick={() => saveTerm(t.TERM_ID)}
+                            disabled={savingTermId === t.TERM_ID}
+                          >
                             {savingTermId === t.TERM_ID && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
                             Save
                           </Button>
@@ -265,8 +312,9 @@ const Activities = () => {
           </Button>
         </CardHeader>
         <CardContent>
+          {/* Term tabs */}
           {!loading && terms.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
               {terms.map((t) => (
                 <Button
                   key={t.TERM_ID}
@@ -280,11 +328,46 @@ const Activities = () => {
             </div>
           )}
 
+          {/* Grade level filter */}
+          {!loading && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="text-sm font-medium text-gray-600">Grade:</span>
+              <Button
+                size="sm"
+                variant={gradeFilter === '' ? 'default' : 'outline'}
+                onClick={() => setGradeFilter('')}
+              >
+                All Grades
+              </Button>
+              {GRADE_LEVELS.slice(1).map((g) => (
+                <Button
+                  key={g}
+                  size="sm"
+                  variant={gradeFilter === g ? 'default' : 'outline'}
+                  onClick={() => setGradeFilter(g)}
+                >
+                  Grade {g}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {gradeFilter && (
+            <p className="text-xs text-gray-500 mb-3 rounded-md bg-amber-50 border border-amber-200 p-2">
+              Showing activities for <strong>Grade {gradeFilter}</strong> + activities assigned to all grades.
+              Activities with a specific grade only count for students in that grade.
+            </p>
+          )}
+
           {!loading && termActivities.length === 0 ? (
             <EmptyState
               icon={ClipboardList}
-              title="No activities for this term"
-              description="Add an activity under the selected term."
+              title="No activities for this selection"
+              description={
+                gradeFilter
+                  ? `No activities for Grade ${gradeFilter} in this term. Add one or switch to "All Grades".`
+                  : 'Add an activity under the selected term.'
+              }
               action={
                 <Button onClick={openCreateActivity} disabled={!activeTerm}>
                   <Plus className="w-4 h-4 mr-2" /> Add Activity
@@ -300,6 +383,7 @@ const Activities = () => {
                     <TableHead>Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Max Score</TableHead>
+                    <TableHead>Grade Level</TableHead>
                     <TableHead>Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -313,6 +397,15 @@ const Activities = () => {
                         <Badge variant="secondary">{a.ACTIVITY_TYPE}</Badge>
                       </TableCell>
                       <TableCell>{a.MAX_SCORE}</TableCell>
+                      <TableCell>
+                        {a.GRADE_LEVEL ? (
+                          <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">
+                            Grade {a.GRADE_LEVEL}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-gray-400">All Grades</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Switch checked={!!a.IS_ACTIVE} onCheckedChange={() => toggleActive(a)} />
                       </TableCell>
@@ -335,19 +428,24 @@ const Activities = () => {
         </CardContent>
       </Card>
 
-      {/* Activity dialog */}
+      {/* Activity create/edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
             <DialogDescription>
-              {editingActivity ? 'Update activity details.' : `New activity for "${terms.find((t) => t.TERM_ID === activeTerm)?.TERM_NAME || ''}".`}
+              {editingActivity
+                ? 'Update activity details.'
+                : `New activity for "${terms.find((t) => t.TERM_ID === activeTerm)?.TERM_NAME || ''}".`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveActivity} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Activity Name *</Label>
-              <Input value={actForm.activityName} onChange={(e) => setActForm({ ...actForm, activityName: e.target.value })} />
+              <Input
+                value={actForm.activityName}
+                onChange={(e) => setActForm({ ...actForm, activityName: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
@@ -366,7 +464,29 @@ const Activities = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Max Score *</Label>
-              <Input type="number" value={actForm.maxScore} onChange={(e) => setActForm({ ...actForm, maxScore: e.target.value })} />
+              <Input
+                type="number"
+                value={actForm.maxScore}
+                onChange={(e) => setActForm({ ...actForm, maxScore: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Grade Level</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                value={actForm.gradeLevel}
+                onChange={(e) => setActForm({ ...actForm, gradeLevel: e.target.value })}
+              >
+                <option value="">All Grades (shared)</option>
+                {GRADE_LEVELS.slice(1).map((g) => (
+                  <option key={g} value={g}>Grade {g}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400">
+                Leave as "All Grades" for activities shared across every grade.
+                Set a specific grade to create grade-level-specific activities
+                that only count for students in that grade.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={savingAct}>
@@ -387,7 +507,11 @@ const Activities = () => {
         onConfirm={handleDelete}
         loading={deleting}
         title="Delete activity?"
-        description={deleteTarget ? `Delete "${deleteTarget.ACTIVITY_NAME}"? Existing scores for this activity will remain but may no longer calculate.` : ''}
+        description={
+          deleteTarget
+            ? `Delete "${deleteTarget.ACTIVITY_NAME}"? Existing scores for this activity will remain but may no longer calculate.`
+            : ''
+        }
         confirmText="Delete"
       />
     </div>

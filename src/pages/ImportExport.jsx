@@ -3,9 +3,20 @@
  * Plan Page 12 — Bulk data management.
  * Covers: Student import, Score import, Student export.
  *
- * Import flow: Download template → Upload CSV → Preview → Validate → Commit
+ * Import flow: Download Excel template → open/edit in Excel or Google Sheets →
+ *              download as .xlsx → Upload here → Preview → Validate → Commit
+ *
+ * FIX: This page used to read/write raw CSV text. CSV loses number formatting,
+ * doesn't round-trip cleanly through Google Sheets ("File > Download > Excel"
+ * re-adds a BOM / different quoting that the old hand-rolled parser choked
+ * on), and isn't what the school actually works in day to day. Everything
+ * here now goes through SheetJS (the `xlsx` package) so both the downloaded
+ * template and the exported data are real .xlsx workbooks — the same files
+ * can be opened directly in Excel or uploaded to Google Drive and edited as
+ * a Google Sheet, then re-exported as .xlsx and uploaded back here.
  */
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,27 +42,50 @@ import { importExportAPI } from '@/api/sgmsAPI';
 import { PageHeader } from '@/components/PageState';
 import { toast } from 'sonner';
 
-// ─── CSV helpers ────────────────────────────────────────────────────────────
+// ─── Excel (.xlsx) helpers ──────────────────────────────────────────────────
 
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-  const rows = lines.slice(1).map((line) =>
-    line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''))
-  );
-  return { headers, rows };
+/**
+ * Read an uploaded .xlsx/.xls file and return { headers, rows } — rows are
+ * arrays of cell values in header order, mirroring the old CSV shape so the
+ * rest of this file (preview table, commit handlers) didn't need to change.
+ */
+function parseXLSXFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        // header:1 -> array-of-arrays, raw rows exactly as typed in the sheet
+        const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+        const nonEmpty = aoa.filter((r) => r.some((c) => String(c ?? '').trim() !== ''));
+        if (nonEmpty.length < 1) {
+          resolve({ headers: [], rows: [] });
+          return;
+        }
+        const headers = nonEmpty[0].map((h) => String(h).trim());
+        const rows = nonEmpty.slice(1).map((r) =>
+          headers.map((_, i) => String(r[i] ?? '').trim())
+        );
+        resolve({ headers, rows });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
 }
 
-function downloadCSV(filename, headers, rows) {
-  const content = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-  const blob = new Blob([content], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+/** Build and download a real .xlsx workbook (opens fine in Excel & Google Sheets). */
+function downloadXLSX(filename, sheetName, headers, rows) {
+  const aoa = [headers, ...rows];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+  XLSX.writeFile(workbook, filename);
 }
 
 // ─── Student template headers (must match backend STUDENTS sheet) ────────────
@@ -78,33 +112,29 @@ const ImportStudentsTab = () => {
   const [result, setResult] = useState(null);
 
   const handleDownloadTemplate = () => {
-    downloadCSV('sgms_students_template.csv', STUDENT_HEADERS, [
+    downloadXLSX('sgms_students_template.xlsx', 'Students', STUDENT_HEADERS, [
       ['', 'ชื่อภาษาไทย', 'English Name', '5', '1', '1', 'Active'],
     ]);
     toast.success('Template downloaded');
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setResult(null);
     setParseError('');
     setPreview(null);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const { headers, rows } = parseCSV(ev.target.result);
-        const missing = STUDENT_HEADERS.filter((h) => !headers.includes(h));
-        if (missing.length > 0) {
-          setParseError(`Missing required columns: ${missing.join(', ')}`);
-          return;
-        }
-        setPreview({ headers, rows });
-      } catch {
-        setParseError('Could not parse CSV file. Please use the provided template.');
+    try {
+      const { headers, rows } = await parseXLSXFile(file);
+      const missing = STUDENT_HEADERS.filter((h) => !headers.includes(h));
+      if (missing.length > 0) {
+        setParseError(`Missing required columns: ${missing.join(', ')}`);
+        return;
       }
-    };
-    reader.readAsText(file);
+      setPreview({ headers, rows });
+    } catch {
+      setParseError('Could not read this Excel file. Please use the provided template (.xlsx).');
+    }
     // reset input so same file can be re-selected
     e.target.value = '';
   };
@@ -138,12 +168,14 @@ const ImportStudentsTab = () => {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-500 mb-3">
-            Download the CSV template, fill in your student data, then upload it below.
-            Leave STUDENT_ID blank — the system generates it automatically.
+            Download the Excel (.xlsx) template, fill in your student data — you can edit it
+            in Excel or upload it to Google Drive and edit as a Google Sheet — then download it
+            as .xlsx and upload it below. Leave STUDENT_ID blank — the system generates it
+            automatically.
           </p>
           <Button variant="outline" onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-2" />
-            Download Student Template
+            Download Student Template (.xlsx)
           </Button>
         </CardContent>
       </Card>
@@ -157,9 +189,9 @@ const ImportStudentsTab = () => {
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="w-4 h-4 mr-2" />
-              Choose CSV File
+              Choose Excel File
             </Button>
-            <input ref={fileRef} type="file" accept=".csv" hidden onChange={handleFileChange} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Import Mode:</label>
               <select
@@ -251,33 +283,29 @@ const ImportScoresTab = () => {
   const [result, setResult] = useState(null);
 
   const handleDownloadTemplate = () => {
-    downloadCSV('sgms_scores_template.csv', SCORE_HEADERS, [
+    downloadXLSX('sgms_scores_template.xlsx', 'Scores', SCORE_HEADERS, [
       ['STD001', 'ACT001', '80'],
     ]);
     toast.success('Template downloaded');
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setResult(null);
     setParseError('');
     setPreview(null);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const { headers, rows } = parseCSV(ev.target.result);
-        const missing = SCORE_HEADERS.filter((h) => !headers.includes(h));
-        if (missing.length > 0) {
-          setParseError(`Missing required columns: ${missing.join(', ')}`);
-          return;
-        }
-        setPreview({ headers, rows });
-      } catch {
-        setParseError('Could not parse CSV file. Please use the provided template.');
+    try {
+      const { headers, rows } = await parseXLSXFile(file);
+      const missing = SCORE_HEADERS.filter((h) => !headers.includes(h));
+      if (missing.length > 0) {
+        setParseError(`Missing required columns: ${missing.join(', ')}`);
+        return;
       }
-    };
-    reader.readAsText(file);
+      setPreview({ headers, rows });
+    } catch {
+      setParseError('Could not read this Excel file. Please use the provided template (.xlsx).');
+    }
     e.target.value = '';
   };
 
@@ -309,12 +337,12 @@ const ImportScoresTab = () => {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-500 mb-3">
-            Download the CSV template, fill in STUDENT_ID, ACTIVITY_ID, and RAW_SCORE,
-            then upload.
+            Download the Excel (.xlsx) template, fill in STUDENT_ID, ACTIVITY_ID, and
+            RAW_SCORE — editable in Excel or as a Google Sheet — then upload it as .xlsx.
           </p>
           <Button variant="outline" onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-2" />
-            Download Score Template
+            Download Score Template (.xlsx)
           </Button>
         </CardContent>
       </Card>
@@ -326,9 +354,9 @@ const ImportScoresTab = () => {
         <CardContent className="space-y-4">
           <Button variant="outline" onClick={() => fileRef.current?.click()}>
             <Upload className="w-4 h-4 mr-2" />
-            Choose CSV File
+            Choose Excel File
           </Button>
-          <input ref={fileRef} type="file" accept=".csv" hidden onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={handleFileChange} />
 
           {parseError && (
             <Alert variant="destructive">
@@ -413,7 +441,7 @@ const ExportStudentsTab = () => {
       }
       const headers = Object.keys(students[0]);
       const rows = students.map((s) => headers.map((h) => String(s[h] ?? '')));
-      downloadCSV('sgms_students_export.csv', headers, rows);
+      downloadXLSX('sgms_students_export.xlsx', 'Students', headers, rows);
       toast.success(`Exported ${students.length} students`);
     } else {
       toast.error(res.message || 'Export failed');
@@ -428,14 +456,14 @@ const ExportStudentsTab = () => {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-500 mb-4">
-            Download all active students as a CSV file. The exported file can be used as
-            a reference or re-imported with the student import tool.
+            Download all active students as an Excel (.xlsx) file. The exported file can be
+            opened in Excel or Google Sheets, and re-imported with the student import tool.
           </p>
           <Button onClick={handleExport} disabled={exporting}>
             {exporting
               ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               : <Download className="w-4 h-4 mr-2" />}
-            Export Students to CSV
+            Export Students to Excel
           </Button>
         </CardContent>
       </Card>

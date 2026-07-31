@@ -14,6 +14,8 @@
  *    receives the JSON body via e.postData.contents regardless of content-type.
  *  - When the backend reports an auth/session failure, the stored token is
  *    cleared so the next navigation redirects to /login.
+ *  - FIX: scoresAPI.getAll added (ScoreEntry.jsx calls it with activityId filter).
+ *  - FIX: importExportAPI.importStudents now accepts (students, mode) as two params.
  */
 
 const APPS_SCRIPT_URL =
@@ -143,8 +145,9 @@ export const activitiesAPI = {
   getOne: async (activityId) => {
     return await makeRequest('getActivity', { activityId }, getToken());
   },
-  create: async (termId, activityData) => {
-    return await makeRequest('createActivity', { termId, ...activityData }, getToken());
+  create: async (activityData) => {
+    // activityData should include: termId, activityName, activityType, maxScore, gradeLevel (optional)
+    return await makeRequest('createActivity', activityData, getToken());
   },
   update: async (activityId, activityData) => {
     return await makeRequest('updateActivity', { activityId, ...activityData }, getToken());
@@ -171,6 +174,16 @@ export const scoresAPI = {
   },
   bulkSave: async (scores) => {
     return await makeRequest('bulkSaveScores', { scores }, getToken());
+  },
+  /**
+   * FIX: getAll added — ScoreEntry.jsx calls scoresAPI.getAll({ activityId }).
+   * This proxies to the same backend endpoint as getByActivity.
+   */
+  getAll: async (filters = {}) => {
+    if (filters.activityId) {
+      return await makeRequest('getScores', { activityId: filters.activityId }, getToken());
+    }
+    return await makeRequest('getScores', filters, getToken());
   },
   getByActivity: async (activityId) => {
     return await makeRequest('getScores', { activityId }, getToken());
@@ -199,14 +212,19 @@ export const qrAPI = {
     // Public endpoint — no auth token required
     return await makeRequest('validateQR', { token });
   },
-  createSession: async (sessionData) => {
-    return await makeRequest('createQRSession', sessionData, getToken());
+  createSession: async (deviceId = 'web') => {
+    // FIX: backend expects payload.deviceId (an object field), but this used
+    // to forward whatever was passed straight through as the payload — when
+    // called as createSession('web') the payload became the *string* "web"
+    // instead of { deviceId: 'web' }. Wrap it properly here.
+    return await makeRequest('createQRSession', { deviceId }, getToken());
   },
   getSession: async (sessionId) => {
     return await makeRequest('getQRSession', { sessionId }, getToken());
   },
-  updateSession: async (sessionId, updates) => {
-    return await makeRequest('updateQRSession', { sessionId, ...updates }, getToken());
+  updateSession: async (sessionId, studentToken) => {
+    // FIX: backend expects { sessionId, studentToken } — pass named field correctly
+    return await makeRequest('updateQRSession', { sessionId, studentToken }, getToken());
   },
 };
 
@@ -216,12 +234,17 @@ export const reportsAPI = {
     return await makeRequest('getStudentReport', { studentId }, getToken());
   },
   getClassReport: async (gradeLevel, sectionNumber) => {
-    return await makeRequest('getClassReport', { gradeLevel, sectionNumber }, getToken());
+    // FIX: backend (handleGetClassReport) reads payload.section, not
+    // payload.sectionNumber — this mismatch meant every class report came
+    // back "Grade level and section are required" or an empty student list.
+    return await makeRequest('getClassReport', { gradeLevel, section: sectionNumber }, getToken());
   },
   getPassFailList: async (gradeLevel, sectionNumber, stageNumber = null) => {
+    // FIX: same mismatch — backend (handleGetPassFailList) reads
+    // payload.section.
     return await makeRequest(
       'getPassFailList',
-      { gradeLevel, sectionNumber, stageNumber },
+      { gradeLevel, section: sectionNumber, stageNumber },
       getToken()
     );
   },
@@ -236,14 +259,21 @@ export const printAPI = {
 
 // ── Import / Export ───────────────────────────────────────────────────────────
 export const importExportAPI = {
-  importStudents: async (csvData) => {
-    return await makeRequest('importStudents', { csvData }, getToken());
+  /**
+   * FIX: Now accepts (students, mode) — the UI calls importStudents(students, mode).
+   * Previously only one param was accepted, dropping the mode.
+   */
+  importStudents: async (students, mode = 'INSERT_NEW_ONLY') => {
+    // FIX: backend reads payload.students (each row keyed like the sheet:
+    // STUDENT_ID, THAI_NAME, ENGLISH_NAME, ...), not payload.csvData.
+    return await makeRequest('importStudents', { students, mode }, getToken());
   },
   exportStudents: async (filters = {}) => {
     return await makeRequest('exportStudents', filters, getToken());
   },
-  importScores: async (csvData) => {
-    return await makeRequest('importScores', { csvData }, getToken());
+  importScores: async (scores) => {
+    // FIX: backend reads payload.scores, not payload.csvData.
+    return await makeRequest('importScores', { scores }, getToken());
   },
 };
 

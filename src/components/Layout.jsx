@@ -1,3 +1,9 @@
+/**
+ * Layout.jsx — App shell with sidebar navigation
+ *
+ * Updated to use the purple/indigo CSS variable theme from index.css.
+ * Sidebar background now uses --sidebar (deep purple) defined in the theme.
+ */
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,15 +26,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-/**
- * Sidebar navigation — matches Plan Part 3 §3 (Sidebar.tsx) specification.
- * Plan requires: Dashboard, Students, Activities, Scores, Reports, Print Reports,
- * Audit Log, Import/Export, Settings.
- * Also includes QR Codes and QR Pairing from the QR system spec.
- *
- * FIX (original): /qr-pairing was missing from menuItems.
- * ADDED: /print-reports and /import-export per plan Pages 10 & 12.
- */
 const menuItems = [
   { path: '/dashboard',     label: 'Dashboard',      icon: LayoutDashboard },
   { path: '/students',      label: 'Students',        icon: Users },
@@ -57,8 +54,8 @@ const NavLinks = ({ onClose }) => {
             onClick={onClose}
             className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-sm ${
               isActive
-                ? 'bg-blue-50 text-blue-600 font-semibold'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-[var(--sidebar-accent)] text-[var(--sidebar-primary)] font-semibold'
+                : 'text-[var(--sidebar-foreground)] opacity-80 hover:opacity-100 hover:bg-[var(--sidebar-accent)]'
             }`}
           >
             <Icon className="w-4 h-4 flex-shrink-0" />
@@ -81,16 +78,16 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[var(--background)]">
       {/* ── Sidebar – Desktop ── */}
-      <aside className="hidden md:flex md:flex-col w-60 bg-white border-r border-gray-200 flex-shrink-0">
-        <div className="p-5 border-b border-gray-200 flex items-center gap-3">
-          <div className="p-1.5 bg-blue-600 rounded-lg flex-shrink-0">
-            <GraduationCap className="w-5 h-5 text-white" />
+      <aside className="hidden md:flex md:flex-col w-60 bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] flex-shrink-0">
+        <div className="p-5 border-b border-[var(--sidebar-border)] flex items-center gap-3">
+          <div className="p-1.5 bg-[var(--sidebar-primary)] rounded-lg flex-shrink-0">
+            <GraduationCap className="w-5 h-5 text-[var(--sidebar-foreground)]" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-blue-600 leading-none">SGMS</h1>
-            <p className="text-xs text-gray-400 leading-none mt-0.5">Grade Management</p>
+            <h1 className="text-lg font-bold text-[var(--sidebar-primary)] leading-none">SGMS</h1>
+            <p className="text-xs text-[var(--sidebar-foreground)] opacity-60 leading-none mt-0.5">Grade Management</p>
           </div>
         </div>
 
@@ -98,20 +95,23 @@ const Layout = () => {
           <NavLinks />
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-[var(--sidebar-border)]">
           <div className="flex items-center gap-2 mb-2 px-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[var(--sidebar-accent)] text-[var(--sidebar-primary)] flex items-center justify-center text-sm font-bold flex-shrink-0">
               {admin?.name?.[0]?.toUpperCase() || 'A'}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{admin?.name}</p>
-              <p className="text-xs text-gray-400">Administrator</p>
+              <p className="text-sm font-medium text-[var(--sidebar-foreground)] truncate">{admin?.name}</p>
+              <p className="text-xs text-[var(--sidebar-foreground)] opacity-50">Administrator</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-start gap-2 px-3 py-2 rounded-lg text-sm text-[var(--sidebar-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--sidebar-accent)] transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
             Logout
-          </Button>
+          </button>
         </div>
       </aside>
 
@@ -119,16 +119,20 @@ const Layout = () => {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-64 bg-white flex flex-col shadow-xl">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+          <aside className="fixed inset-y-0 left-0 w-64 bg-[var(--sidebar)] flex flex-col shadow-xl">
+            <div className="p-5 border-b border-[var(--sidebar-border)] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-blue-600 rounded-lg">
-                  <GraduationCap className="w-5 h-5 text-white" />
+                <div className="p-1.5 bg-[var(--sidebar-primary)] rounded-lg">
+                  <GraduationCap className="w-5 h-5 text-[var(--sidebar-foreground)]" />
                 </div>
-                <h1 className="text-lg font-bold text-blue-600">SGMS</h1>
+                <h1 className="text-lg font-bold text-[var(--sidebar-primary)]">SGMS</h1>
               </div>
-              <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu" className="p-1">
-                <X className="w-5 h-5 text-gray-500" />
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+                className="p-1 text-[var(--sidebar-foreground)] opacity-60 hover:opacity-100"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -136,20 +140,23 @@ const Layout = () => {
               <NavLinks onClose={() => setMobileMenuOpen(false)} />
             </nav>
 
-            <div className="p-3 border-t border-gray-200 bg-white">
+            <div className="p-3 border-t border-[var(--sidebar-border)]">
               <div className="flex items-center gap-2 mb-2 px-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
+                <div className="w-8 h-8 rounded-full bg-[var(--sidebar-accent)] text-[var(--sidebar-primary)] flex items-center justify-center text-sm font-bold">
                   {admin?.name?.[0]?.toUpperCase() || 'A'}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{admin?.name}</p>
-                  <p className="text-xs text-gray-400">Administrator</p>
+                  <p className="text-sm font-medium text-[var(--sidebar-foreground)]">{admin?.name}</p>
+                  <p className="text-xs text-[var(--sidebar-foreground)] opacity-50">Administrator</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-start gap-2 px-3 py-2 rounded-lg text-sm text-[var(--sidebar-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--sidebar-accent)] transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
                 Logout
-              </Button>
+              </button>
             </div>
           </aside>
         </div>
@@ -158,15 +165,19 @@ const Layout = () => {
       {/* ── Main Content ── */}
       <main className="flex-1 overflow-hidden flex flex-col min-w-0">
         {/* Top Bar – Mobile */}
-        <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
-          <button onClick={() => setMobileMenuOpen(true)} aria-label="Open menu" className="p-1">
-            <Menu className="w-5 h-5 text-gray-600" />
+        <header className="md:hidden bg-[var(--sidebar)] border-b border-[var(--sidebar-border)] px-4 py-3 flex items-center justify-between flex-shrink-0">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+            className="p-1 text-[var(--sidebar-foreground)]"
+          >
+            <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="p-1 bg-blue-600 rounded-md">
-              <GraduationCap className="w-4 h-4 text-white" />
+            <div className="p-1 bg-[var(--sidebar-primary)] rounded-md">
+              <GraduationCap className="w-4 h-4 text-[var(--sidebar-foreground)]" />
             </div>
-            <h1 className="text-base font-bold text-blue-600">SGMS</h1>
+            <h1 className="text-base font-bold text-[var(--sidebar-primary)]">SGMS</h1>
           </div>
           <div className="w-7" />
         </header>

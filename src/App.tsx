@@ -1,10 +1,9 @@
 /**
  * App.tsx — SGMS React Router
  *
- * FIX 1: This file previously contained the Vite boilerplate starter template
- *         (counter/hero) instead of the SGMS router, so the entire app never loaded.
- * FIX 2: Added missing /print-reports and /import-export routes which were linked
- *         in the sidebar nav (Layout.js) but had no Route entry, causing a blank page.
+ * FIX 1: Added missing /print-reports and /import-export routes.
+ * FIX 2: Added public /scan-pair route — the second device opens this
+ *         after scanning the session QR from QRPairing. No auth needed.
  */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -22,6 +21,7 @@ import PrintReports from '@/pages/PrintReports';
 import Settings from '@/pages/Settings';
 import QRGenerate from '@/pages/QRGenerate';
 import QRPairing from '@/pages/QRPairing';
+import QRScanPair from '@/pages/QRScanPair';
 import AuditLog from '@/pages/AuditLog';
 import ImportExport from '@/pages/ImportExport';
 
@@ -35,7 +35,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
       </div>
     );
   }
@@ -47,6 +47,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* PUBLIC route — second device scans session QR and lands here */}
+      <Route path="/scan-pair" element={<QRScanPair />} />
 
       <Route
         path="/"
@@ -62,10 +65,10 @@ function AppRoutes() {
         <Route path="activities" element={<Activities />} />
         <Route path="scores" element={<ScoreEntry />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="print-reports" element={<PrintReports />} />  {/* FIX: was missing */}
+        <Route path="print-reports" element={<PrintReports />} />
         <Route path="qr-generate" element={<QRGenerate />} />
         <Route path="qr-pairing" element={<QRPairing />} />
-        <Route path="import-export" element={<ImportExport />} />  {/* FIX: was missing */}
+        <Route path="import-export" element={<ImportExport />} />
         <Route path="audit" element={<AuditLog />} />
         <Route path="settings" element={<Settings />} />
       </Route>

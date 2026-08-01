@@ -4,10 +4,12 @@
  * FIX 1: Added missing /print-reports and /import-export routes.
  * FIX 2: Added public /scan-pair route — the second device opens this
  *         after scanning the session QR from QRPairing. No auth needed.
+ * NEW: Wrapped in ThemeProvider for the multi-theme system.
  */
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Toaster } from 'sonner';
 
 // Pages
@@ -80,12 +82,14 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <HashRouter>
-        <AppRoutes />
-        <Toaster position="top-right" richColors />
-      </HashRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <HashRouter>
+          <AppRoutes />
+          <Toaster position="top-right" richColors />
+        </HashRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

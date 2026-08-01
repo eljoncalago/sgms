@@ -4,7 +4,8 @@
  *
  * Sections (per plan §13):
  *  - School Information & Branding (name, logo, address, contact, email, principal, system name)
- *  - Calculation Settings (STRICT/PROGRESS mode, passing percentages per stage)
+ *  - Theme Selection (purple, midnight, amber, forest)
+ *  - Calculation Settings (STRICT/PROGRESS mode, passing percentages per stage + per component)
  *  - Print Report Template ID
  *  - Change Password
  *  - Administrator Management (create, enable/disable)
@@ -12,6 +13,9 @@
  * FIX: Added School Branding section which was missing from original Settings.js.
  * The plan explicitly requires: School Name, Logo, School Image, Admin Name,
  * Profile Picture, Signature, Theme, Calculation mode.
+ *
+ * NEW: Theme selector with 4 elegant themes (purple, midnight, amber, forest).
+ * NEW: Per-component passing score inputs for the report card.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,9 +42,12 @@ import {
   Building2,
   Calculator,
   Printer,
+  Palette,
+  Check,
 } from 'lucide-react';
 import { settingsAPI, adminsAPI, authAPI } from '@/api/sgmsAPI';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme, THEMES } from '@/contexts/ThemeContext';
 import { PageHeader, Loading, EmptyState } from '@/components/PageState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
@@ -48,122 +55,183 @@ import { toast } from 'sonner';
 // Keys whose values should be normalised to strings before save
 const NUMERIC_KEYS = [
   'OVERALL_PASSING_PERCENT',
+  'MIDTERM_COLLECTIVE_PASSING',
+  'FINAL_COLLECTIVE_INITIAL_PASSING',
+  'FINAL_COLLECTIVE_FINAL_PASSING',
+  'MIDTERM_EXAM_PASSING',
+  'FINAL_EXAM_PASSING',
   'STAGE1_PASSING',
   'STAGE2_PASSING',
   'STAGE3_PASSING',
   'STAGE4_PASSING',
 ];
 
+// ─── Theme Selector ───────────────────────────────────────────────────────────
+const ThemeSelector = () => {
+  const { theme, changeTheme, themes } = useTheme();
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {Object.values(themes).map((t) => (
+        <button
+          key={t.id}
+          onClick={() => changeTheme(t.id)}
+          className={`relative border-2 rounded-xl p-4 text-left transition-all ${
+            theme === t.id
+              ? 'border-[var(--primary)] ring-2 ring-[var(--primary)] ring-offset-2 ring-offset-[var(--background)]'
+              : 'border-[var(--border)] hover:border-[var(--primary)]'
+          }`}
+        >
+          {/* Preview swatch */}
+          <div
+            className="h-16 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden"
+            style={{ backgroundColor: t.preview.bg }}
+          >
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: t.preview.accent }}
+            />
+            {theme === t.id && (
+              <div className="absolute top-1 right-1 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-full p-0.5">
+                <Check className="w-3 h-3" />
+              </div>
+            )}
+          </div>
+          <div className="font-medium text-sm text-[var(--foreground)]">{t.name}</div>
+          <div className="text-xs text-[var(--muted-foreground)] mt-0.5">{t.description}</div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
 // ─── School Branding Tab ──────────────────────────────────────────────────────
 const BrandingTab = ({ settings, update, saving, onSave }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0">
-      <CardTitle className="flex items-center gap-2">
-        <Building2 className="w-4 h-4" />
-        School Information &amp; Branding
-      </CardTitle>
-      <Button onClick={onSave} disabled={saving}>
-        {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-        Save
-      </Button>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* School Name */}
-        <div className="space-y-1.5 md:col-span-2">
-          <Label>School Name</Label>
-          <Input
-            value={settings?.SCHOOL_NAME || ''}
-            onChange={(e) => update('SCHOOL_NAME', e.target.value)}
-            placeholder="e.g. Bangkok International School"
-          />
-        </div>
+  <div className="space-y-4">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <Palette className="w-4 h-4" />
+          Theme Selection
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-[var(--muted-foreground)] mb-4">
+          Choose a theme for your interface. The theme applies instantly and is saved to this browser.
+        </p>
+        <ThemeSelector />
+      </CardContent>
+    </Card>
 
-        {/* System Name */}
-        <div className="space-y-1.5">
-          <Label>System Name</Label>
-          <Input
-            value={settings?.SYSTEM_NAME || ''}
-            onChange={(e) => update('SYSTEM_NAME', e.target.value)}
-            placeholder="SGMS"
-          />
-        </div>
-
-        {/* Principal Name */}
-        <div className="space-y-1.5">
-          <Label>Principal Name</Label>
-          <Input
-            value={settings?.PRINCIPAL_NAME || ''}
-            onChange={(e) => update('PRINCIPAL_NAME', e.target.value)}
-            placeholder="e.g. Dr. Somchai Jaidee"
-          />
-        </div>
-
-        {/* School Address */}
-        <div className="space-y-1.5 md:col-span-2">
-          <Label>School Address</Label>
-          <Input
-            value={settings?.SCHOOL_ADDRESS || ''}
-            onChange={(e) => update('SCHOOL_ADDRESS', e.target.value)}
-            placeholder="123 Education Road, Bangkok 10110"
-          />
-        </div>
-
-        {/* Phone */}
-        <div className="space-y-1.5">
-          <Label>Contact Phone</Label>
-          <Input
-            value={settings?.SCHOOL_PHONE || ''}
-            onChange={(e) => update('SCHOOL_PHONE', e.target.value)}
-            placeholder="+66 2 123 4567"
-          />
-        </div>
-
-        {/* Email */}
-        <div className="space-y-1.5">
-          <Label>School Email</Label>
-          <Input
-            type="email"
-            value={settings?.SCHOOL_EMAIL || ''}
-            onChange={(e) => update('SCHOOL_EMAIL', e.target.value)}
-            placeholder="admin@school.ac.th"
-          />
-        </div>
-
-        {/* School Logo URL */}
-        <div className="space-y-1.5 md:col-span-2">
-          <Label>School Logo URL</Label>
-          <Input
-            value={settings?.SCHOOL_LOGO_URL || ''}
-            onChange={(e) => update('SCHOOL_LOGO_URL', e.target.value)}
-            placeholder="https://yourschool.com/logo.png"
-          />
-          <p className="text-xs text-gray-400">
-            Host your logo image publicly (e.g. in Google Drive with sharing set to "Anyone with link") and paste the direct URL here.
-          </p>
-          {settings?.SCHOOL_LOGO_URL && (
-            <img
-              src={settings.SCHOOL_LOGO_URL}
-              alt="School logo preview"
-              className="h-16 object-contain border rounded p-1 mt-1"
-              onError={(e) => { e.target.style.display = 'none'; }}
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="w-4 h-4" />
+          School Information &amp; Branding
+        </CardTitle>
+        <Button onClick={onSave} disabled={saving}>
+          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+          Save
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* School Name */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>School Name</Label>
+            <Input
+              value={settings?.SCHOOL_NAME || ''}
+              onChange={(e) => update('SCHOOL_NAME', e.target.value)}
+              placeholder="e.g. Bangkok International School"
             />
-          )}
-        </div>
+          </div>
 
-        {/* School Image URL */}
-        <div className="space-y-1.5 md:col-span-2">
-          <Label>School Image / Banner URL</Label>
-          <Input
-            value={settings?.SCHOOL_IMAGE_URL || ''}
-            onChange={(e) => update('SCHOOL_IMAGE_URL', e.target.value)}
-            placeholder="https://yourschool.com/school.jpg"
-          />
-          <p className="text-xs text-gray-400">Displayed on the Login screen and Dashboard header.</p>
+          {/* System Name */}
+          <div className="space-y-1.5">
+            <Label>System Name</Label>
+            <Input
+              value={settings?.SYSTEM_NAME || ''}
+              onChange={(e) => update('SYSTEM_NAME', e.target.value)}
+              placeholder="SGMS"
+            />
+          </div>
+
+          {/* Principal Name */}
+          <div className="space-y-1.5">
+            <Label>Principal Name</Label>
+            <Input
+              value={settings?.PRINCIPAL_NAME || ''}
+              onChange={(e) => update('PRINCIPAL_NAME', e.target.value)}
+              placeholder="e.g. Dr. Somchai Jaidee"
+            />
+          </div>
+
+          {/* School Address */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>School Address</Label>
+            <Input
+              value={settings?.SCHOOL_ADDRESS || ''}
+              onChange={(e) => update('SCHOOL_ADDRESS', e.target.value)}
+              placeholder="123 Education Road, Bangkok 10110"
+            />
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-1.5">
+            <Label>Contact Phone</Label>
+            <Input
+              value={settings?.SCHOOL_PHONE || ''}
+              onChange={(e) => update('SCHOOL_PHONE', e.target.value)}
+              placeholder="+66 2 123 4567"
+            />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label>School Email</Label>
+            <Input
+              type="email"
+              value={settings?.SCHOOL_EMAIL || ''}
+              onChange={(e) => update('SCHOOL_EMAIL', e.target.value)}
+              placeholder="admin@school.ac.th"
+            />
+          </div>
+
+          {/* School Logo URL */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>School Logo URL</Label>
+            <Input
+              value={settings?.SCHOOL_LOGO_URL || ''}
+              onChange={(e) => update('SCHOOL_LOGO_URL', e.target.value)}
+              placeholder="https://yourschool.com/logo.png"
+            />
+            <p className="text-xs text-gray-400">
+              Host your logo image publicly (e.g. in Google Drive with sharing set to "Anyone with link") and paste the direct URL here.
+            </p>
+            {settings?.SCHOOL_LOGO_URL && (
+              <img
+                src={settings.SCHOOL_LOGO_URL}
+                alt="School logo preview"
+                className="h-16 object-contain border rounded p-1 mt-1"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            )}
+          </div>
+
+          {/* School Image URL */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>School Image / Banner URL</Label>
+            <Input
+              value={settings?.SCHOOL_IMAGE_URL || ''}
+              onChange={(e) => update('SCHOOL_IMAGE_URL', e.target.value)}
+              placeholder="https://yourschool.com/school.jpg"
+            />
+            <p className="text-xs text-gray-400">Displayed on the Login screen and Dashboard header.</p>
+          </div>
         </div>
-      </div>
-    </CardContent>
-  </Card>
+      </CardContent>
+    </Card>
+  </div>
 );
 
 // ─── Calculation Settings Tab ─────────────────────────────────────────────────
@@ -192,12 +260,12 @@ const CalculationTab = ({ settings, update, saving, onSave }) => (
                   onClick={() => update('CALCULATION_MODE', mode)}
                   className={`flex-1 border rounded-lg p-3 text-left transition-colors ${
                     (settings?.CALCULATION_MODE || 'STRICT') === mode
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-[var(--primary)] bg-[var(--accent)] text-[var(--accent-foreground)]'
+                      : 'border-[var(--border)] hover:border-[var(--primary)]'
                   }`}
                 >
                   <div className="font-medium text-sm">{mode}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
                     {mode === 'STRICT'
                       ? 'Missing scores count as 0 — used for official grades'
                       : 'Only recorded activities are calculated — used for progress monitoring'}
@@ -207,7 +275,77 @@ const CalculationTab = ({ settings, update, saving, onSave }) => (
             </div>
           </div>
 
-          {/* Passing Percentages */}
+          {/* Per-component passing scores */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label className="text-base font-semibold">Individual Component Passing Scores</Label>
+            <p className="text-xs text-[var(--muted-foreground)] mb-2">
+              These thresholds control the PASS/FAIL remark for each individual score component on the report card.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Midterm Collective Passing</Label>
+            <Input
+              type="number"
+              min="0"
+              value={settings?.MIDTERM_COLLECTIVE_PASSING ?? ''}
+              onChange={(e) => update('MIDTERM_COLLECTIVE_PASSING', e.target.value)}
+              placeholder="50"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Final Collective Initial Passing</Label>
+            <Input
+              type="number"
+              min="0"
+              value={settings?.FINAL_COLLECTIVE_INITIAL_PASSING ?? ''}
+              onChange={(e) => update('FINAL_COLLECTIVE_INITIAL_PASSING', e.target.value)}
+              placeholder="50"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Final Collective Final Passing</Label>
+            <Input
+              type="number"
+              min="0"
+              value={settings?.FINAL_COLLECTIVE_FINAL_PASSING ?? ''}
+              onChange={(e) => update('FINAL_COLLECTIVE_FINAL_PASSING', e.target.value)}
+              placeholder="50"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Midterm Examination Passing</Label>
+            <Input
+              type="number"
+              min="0"
+              value={settings?.MIDTERM_EXAM_PASSING ?? ''}
+              onChange={(e) => update('MIDTERM_EXAM_PASSING', e.target.value)}
+              placeholder="50"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Final Examination Passing</Label>
+            <Input
+              type="number"
+              min="0"
+              value={settings?.FINAL_EXAM_PASSING ?? ''}
+              onChange={(e) => update('FINAL_EXAM_PASSING', e.target.value)}
+              placeholder="50"
+            />
+          </div>
+
+          {/* Cumulative stage passing scores */}
+          <div className="space-y-1.5 md:col-span-2 mt-2">
+            <Label className="text-base font-semibold">Cumulative Stage Passing Scores</Label>
+            <p className="text-xs text-[var(--muted-foreground)] mb-2">
+              These thresholds control the PASS/FAIL remarks in the semester grade summary table.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Overall Passing % (final grade)</Label>
             <Input

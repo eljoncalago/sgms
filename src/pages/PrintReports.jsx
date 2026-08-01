@@ -12,6 +12,9 @@
  *
  * Note: PrintService.gs requires a properly formatted Excel template to exist
  * in Google Drive. See INSTALLATION_GUIDE.md → PrintService setup.
+ *
+ * FIX: printAPI.generate now requires templateId as a third argument so the
+ * backend can open the template file from Google Drive.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -120,10 +123,11 @@ const PrintReports = () => {
     setGenerating(true);
     setResult(null);
 
+    // FIX: pass templateId as the third argument so the backend can open the file
     const res = await printAPI.generate(
       Array.from(selected),
-      templateId,
-      Number(stage)
+      Number(stage),
+      templateId
     );
 
     setGenerating(false);

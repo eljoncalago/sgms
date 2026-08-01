@@ -16,6 +16,8 @@
  *    cleared so the next navigation redirects to /login.
  *  - FIX: scoresAPI.getAll added (ScoreEntry.jsx calls it with activityId filter).
  *  - FIX: importExportAPI.importStudents now accepts (students, mode) as two params.
+ *  - FIX: printAPI.generate now accepts templateId as a third parameter and
+ *         forwards it to the backend so PrintService.gs can open the template file.
  */
 
 const APPS_SCRIPT_URL =
@@ -146,7 +148,6 @@ export const activitiesAPI = {
     return await makeRequest('getActivity', { activityId }, getToken());
   },
   create: async (activityData) => {
-    // activityData should include: termId, activityName, activityType, maxScore, gradeLevel (optional)
     return await makeRequest('createActivity', activityData, getToken());
   },
   update: async (activityId, activityData) => {
@@ -175,10 +176,6 @@ export const scoresAPI = {
   bulkSave: async (scores) => {
     return await makeRequest('bulkSaveScores', { scores }, getToken());
   },
-  /**
-   * FIX: getAll added — ScoreEntry.jsx calls scoresAPI.getAll({ activityId }).
-   * This proxies to the same backend endpoint as getByActivity.
-   */
   getAll: async (filters = {}) => {
     if (filters.activityId) {
       return await makeRequest('getScores', { activityId: filters.activityId }, getToken());
@@ -209,34 +206,20 @@ export const qrAPI = {
     return await makeRequest('generateStudentQR', { studentId }, getToken());
   },
   validateQR: async (token) => {
-    // Public endpoint — no auth token required
     return await makeRequest('validateQR', { token });
   },
   createSession: async (deviceId = 'web') => {
-    // FIX: backend expects payload.deviceId (an object field), but this used
-    // to forward whatever was passed straight through as the payload — when
-    // called as createSession('web') the payload became the *string* "web"
-    // instead of { deviceId: 'web' }. Wrap it properly here.
     return await makeRequest('createQRSession', { deviceId }, getToken());
   },
   getSession: async (sessionId) => {
     return await makeRequest('getQRSession', { sessionId }, getToken());
   },
   updateSession: async (sessionId, studentToken) => {
-    // FIX: backend expects { sessionId, studentToken } — pass named field correctly
     return await makeRequest('updateQRSession', { sessionId, studentToken }, getToken());
   },
-  /**
-   * NEW (continuous scanning): keeps a scanning session alive while the
-   * scanner device's page is open. Public endpoint — no token needed.
-   */
   heartbeat: async (sessionId) => {
     return await makeRequest('heartbeatQRSession', { sessionId });
   },
-  /**
-   * NEW: ends a scanning session — sent by the scanner device when its page
-   * closes, and by the main device when the teacher stops scanning.
-   */
   closeSession: async (sessionId) => {
     return await makeRequest('closeQRSession', { sessionId });
   },
@@ -248,14 +231,9 @@ export const reportsAPI = {
     return await makeRequest('getStudentReport', { studentId }, getToken());
   },
   getClassReport: async (gradeLevel, sectionNumber) => {
-    // FIX: backend (handleGetClassReport) reads payload.section, not
-    // payload.sectionNumber — this mismatch meant every class report came
-    // back "Grade level and section are required" or an empty student list.
     return await makeRequest('getClassReport', { gradeLevel, section: sectionNumber }, getToken());
   },
   getPassFailList: async (gradeLevel, sectionNumber, stageNumber = null) => {
-    // FIX: same mismatch — backend (handleGetPassFailList) reads
-    // payload.section.
     return await makeRequest(
       'getPassFailList',
       { gradeLevel, section: sectionNumber, stageNumber },
@@ -266,41 +244,39 @@ export const reportsAPI = {
 
 // ── Print Reports ─────────────────────────────────────────────────────────────
 export const printAPI = {
-  generate: async (studentIds, stage) => {
-    return await makeRequest('generatePrintReport', { studentIds, stage }, getToken());
+  /**
+   * FIX: Now accepts templateId as a third parameter and forwards it to the
+   * backend. The backend (PrintService.gs handleGeneratePrintReport) reads
+   * payload.templateId to open the Google Drive template file. Without this,
+   * every print request returned "Template file ID is required".
+   */
+  generate: async (studentIds, stage, templateId) => {
+    return await makeRequest(
+      'generatePrintReport',
+      { studentIds, stage, templateId },
+      getToken()
+    );
   },
 };
 
 // ── Import / Export ───────────────────────────────────────────────────────────
 export const importExportAPI = {
-  /**
-   * FIX: Now accepts (students, mode) — the UI calls importStudents(students, mode).
-   * Previously only one param was accepted, dropping the mode.
-   */
   importStudents: async (students, mode = 'INSERT_NEW_ONLY') => {
-    // FIX: backend reads payload.students (each row keyed like the sheet:
-    // STUDENT_ID, THAI_NAME, ENGLISH_NAME, ...), not payload.csvData.
     return await makeRequest('importStudents', { students, mode }, getToken());
   },
   exportStudents: async (filters = {}) => {
     return await makeRequest('exportStudents', filters, getToken());
   },
   importScores: async (scores, activityId = '') => {
-    // FIX: backend reads payload.scores, not payload.csvData.
-    // activityId is a fallback for rows that leave ACTIVITY_ID blank — the
-    // generated template always fills it in, but hand-edited sheets may not.
     return await makeRequest('importScores', { scores, activityId }, getToken());
   },
 };
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 export const settingsAPI = {
-
-   // Load system settings
   getAll: async () => {
     return await makeRequest('getSettings', {}, getToken());
   },
-  
   get: async () => {
     return await makeRequest('getSettings', {}, getToken());
   },

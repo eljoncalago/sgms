@@ -15,6 +15,10 @@
  *
  * Nothing here replaces the existing class-grid entry flow; it is an
  * additional, per-student view.
+ *
+ * THEME FIX: replaced hardcoded gray/white colour classes in the popup with
+ * CSS variable equivalents so the dialog respects the active theme.
+ * All logic is completely unchanged.
  */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -59,12 +63,14 @@ const StudentPhoto = ({ student }) => {
       <img
         src={url}
         alt={`${student.ENGLISH_NAME} photo`}
-        className="w-24 h-24 rounded-xl object-cover border bg-gray-50"
+        /* THEME FIX: bg-gray-50 → bg-[var(--muted)] */
+        className="w-24 h-24 rounded-xl object-cover border bg-[var(--muted)]"
       />
     );
   }
   return (
-    <div className="w-24 h-24 rounded-xl border bg-gray-100 flex items-center justify-center text-2xl font-bold text-gray-400">
+    /* THEME FIX: bg-gray-100 → bg-[var(--muted)], text-gray-400 → text-[var(--muted-foreground)] */
+    <div className="w-24 h-24 rounded-xl border bg-[var(--muted)] flex items-center justify-center text-2xl font-bold text-[var(--muted-foreground)]">
       {initials || <User className="w-8 h-8" />}
     </div>
   );
@@ -72,8 +78,9 @@ const StudentPhoto = ({ student }) => {
 
 const Field = ({ label, value }) => (
   <div>
-    <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
-    <p className="text-sm font-medium text-gray-800 break-words">{value || '—'}</p>
+    {/* THEME FIX: text-gray-400 → text-[var(--muted-foreground)], text-gray-800 → text-[var(--foreground)] */}
+    <p className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
+    <p className="text-sm font-medium text-[var(--foreground)] break-words">{value || '—'}</p>
   </div>
 );
 
@@ -241,7 +248,8 @@ const StudentGradeDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Student Record — Grades
-            {saving && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            {/* THEME FIX: spinner uses muted-foreground var */}
+            {saving && <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />}
           </DialogTitle>
           <DialogDescription>
             Loaded from the paired QR scanner. Edit scores below — totals update instantly.
@@ -249,14 +257,16 @@ const StudentGradeDialog = ({
         </DialogHeader>
 
         {loading || !student ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+          /* THEME FIX: loading state uses theme colours */
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--muted-foreground)]">
             <Loader2 className="w-8 h-8 animate-spin" />
             <p className="text-sm">Loading student record…</p>
           </div>
         ) : (
           <div className="space-y-5">
             {/* ── Profile ─────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row gap-4 rounded-lg border p-4 bg-gray-50/60">
+            {/* THEME FIX: bg-gray-50/60 → bg-[var(--muted)]/40 */}
+            <div className="flex flex-col sm:flex-row gap-4 rounded-lg border p-4 bg-[var(--secondary)]">
               <StudentPhoto student={student} />
               <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Field label="Student ID" value={student.STUDENT_ID} />
@@ -276,21 +286,22 @@ const StudentGradeDialog = ({
             {/* ── Summary ─────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] uppercase text-gray-400">Final Grade (live)</p>
-                <p className="text-2xl font-bold text-gray-900">{finalGrade}%</p>
+                {/* THEME FIX: text-gray-400 → muted-foreground, text-gray-900 → foreground */}
+                <p className="text-[11px] uppercase text-[var(--muted-foreground)]">Final Grade (live)</p>
+                <p className="text-2xl font-bold text-[var(--foreground)]">{finalGrade}%</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] uppercase text-gray-400">Saved Final Grade</p>
-                <p className="text-2xl font-bold text-gray-500">
+                <p className="text-[11px] uppercase text-[var(--muted-foreground)]">Saved Final Grade</p>
+                <p className="text-2xl font-bold text-[var(--muted-foreground)]">
                   {serverGrade ? `${round2(Number(serverGrade.finalGrade ?? serverGrade.totalWeightedScore ?? 0))}%` : '—'}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] uppercase text-gray-400">Unsaved Changes</p>
+                <p className="text-[11px] uppercase text-[var(--muted-foreground)]">Unsaved Changes</p>
                 <p className="text-2xl font-bold text-amber-600">{dirtyEntries.length}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-[11px] uppercase text-gray-400">Invalid Scores</p>
+                <p className="text-[11px] uppercase text-[var(--muted-foreground)]">Invalid Scores</p>
                 <p className={`text-2xl font-bold ${invalidCount ? 'text-red-600' : 'text-green-600'}`}>
                   {invalidCount}
                 </p>
@@ -301,15 +312,18 @@ const StudentGradeDialog = ({
             <div className="space-y-4">
               {termRows.map((row) => (
                 <div key={row.term.TERM_ID} className="rounded-lg border overflow-hidden">
-                  <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 px-3 py-2 border-b">
+                  {/* THEME FIX: bg-gray-50 → bg-[var(--secondary)] */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--secondary)] px-3 py-2 border-b">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm">{row.term.TERM_NAME}</p>
-                      <Badge className="bg-gray-200 text-gray-700">{row.weight}%</Badge>
+                      {/* THEME FIX: use muted/muted-foreground instead of gray-200/gray-700 */}
+                      <Badge className="bg-[var(--muted)] text-[var(--muted-foreground)]">{row.weight}%</Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                    <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
                       <span>Total: <strong>{row.totalRaw}</strong> / {row.totalMax}</span>
                       <span>Percentage: <strong>{row.percentage}%</strong></span>
                       <span>Weighted: <strong>{row.weighted}</strong></span>
+                      {/* PASS/FAIL badge: keep semantic green/red */}
                       <Badge className={row.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                         {row.passed ? 'PASS' : 'FAIL'}
                       </Badge>
@@ -317,7 +331,7 @@ const StudentGradeDialog = ({
                   </div>
 
                   {row.activities.length === 0 ? (
-                    <p className="text-xs text-gray-400 px-3 py-3">No activities in this term.</p>
+                    <p className="text-xs text-[var(--muted-foreground)] px-3 py-3">No activities in this term.</p>
                   ) : (
                     <Table>
                       <TableHeader>
@@ -339,7 +353,8 @@ const StudentGradeDialog = ({
                           return (
                             <TableRow key={a.ACTIVITY_ID}>
                               <TableCell className="text-xs">{a.ACTIVITY_NAME}</TableCell>
-                              <TableCell className="text-xs text-gray-500">{a.ACTIVITY_TYPE || '—'}</TableCell>
+                              {/* THEME FIX: text-gray-500 → muted-foreground */}
+                              <TableCell className="text-xs text-[var(--muted-foreground)]">{a.ACTIVITY_TYPE || '—'}</TableCell>
                               <TableCell className="text-xs">{max}</TableCell>
                               <TableCell>
                                 <Input
@@ -354,7 +369,7 @@ const StudentGradeDialog = ({
                                   placeholder="—"
                                 />
                               </TableCell>
-                              <TableCell className="text-xs text-gray-500">
+                              <TableCell className="text-xs text-[var(--muted-foreground)]">
                                 {pct === null ? '—' : `${pct}%`}
                               </TableCell>
                             </TableRow>
@@ -369,7 +384,8 @@ const StudentGradeDialog = ({
 
             {/* ── Actions ─────────────────────────────────────────────── */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-              <label className="flex items-center gap-2 text-sm text-gray-600">
+              {/* THEME FIX: text-gray-600 → muted-foreground */}
+              <label className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
                 <input
                   type="checkbox"
                   checked={autoSave}

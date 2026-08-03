@@ -1,3 +1,10 @@
+/**
+ * QRGenerate.jsx
+ * THEME FIX: replaced hardcoded bg-blue-50 / text-blue-600 selection state
+ * and bg-white QR card with CSS variable equivalents.
+ * bg-gray-50 hover → bg-[var(--accent)] / bg-[var(--secondary)]
+ * All logic is unchanged.
+ */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,15 +86,17 @@ const QRGenerate = () => {
                     <button
                       key={s.STUDENT_ID}
                       onClick={() => generate(s.STUDENT_ID)}
-                      className={`flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-gray-50 ${
-                        selectedId === s.STUDENT_ID ? 'bg-blue-50' : ''
+                      /* THEME FIX: selected uses accent var, hover uses secondary var */
+                      className={`flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-[var(--secondary)] transition-colors ${
+                        selectedId === s.STUDENT_ID ? 'bg-[var(--accent)]' : ''
                       }`}
                     >
                       <div>
                         <p className="font-medium text-sm">{s.ENGLISH_NAME}</p>
-                        <p className="text-xs text-gray-500 font-mono">{s.STUDENT_ID}</p>
+                        <p className="text-xs text-[var(--muted-foreground)] font-mono">{s.STUDENT_ID}</p>
                       </div>
-                      {selectedId === s.STUDENT_ID && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                      {/* THEME FIX: checkmark uses primary var */}
+                      {selectedId === s.STUDENT_ID && <CheckCircle2 className="w-4 h-4 text-[var(--primary)]" />}
                     </button>
                   ))
                 )}
@@ -106,12 +115,13 @@ const QRGenerate = () => {
               <Loading label="Generating QR…" />
             ) : qrData ? (
               <div className="flex flex-col items-center text-center">
-                <div className="rounded-xl border p-4 bg-white shadow-sm">
+                {/* THEME FIX: QR card uses card CSS variable instead of hardcoded bg-white */}
+                <div className="rounded-xl border p-4 bg-[var(--card)] shadow-sm">
                   <img src={qrData.qrUrl} alt="Student QR" className="w-64 h-64" />
                 </div>
                 <div className="mt-4 space-y-1">
                   <p className="font-semibold">{selectedStudent?.ENGLISH_NAME}</p>
-                  <p className="text-xs text-gray-500 font-mono">{selectedId}</p>
+                  <p className="text-xs text-[var(--muted-foreground)] font-mono">{selectedId}</p>
                   <Badge variant="secondary" className="mt-2 font-mono">{qrData.token}</Badge>
                 </div>
                 <div className="flex gap-2 mt-4">

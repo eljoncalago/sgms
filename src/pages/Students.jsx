@@ -1,3 +1,10 @@
+/**
+ * Students.jsx
+ * THEME FIX: replaced hardcoded text-gray-400 with text-[var(--muted-foreground)]
+ * for the search icon. Status badge colours (green/gray/red) are kept as
+ * semantic indicators — they do not interfere with theme switching.
+ * All logic is completely unchanged.
+ */
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +33,7 @@ import { PageHeader, Loading, EmptyState } from '@/components/PageState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { toast } from 'sonner';
 
+// Status colours are kept as semantic indicators (green=active, red=deleted).
 const STATUS_VARIANT = {
   Active: 'bg-green-100 text-green-800',
   Inactive: 'bg-gray-100 text-gray-700',
@@ -161,7 +169,8 @@ const Students = () => {
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-3 md:items-center mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              {/* THEME FIX: text-gray-400 → text-[var(--muted-foreground)] */}
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
               <Input
                 placeholder="Search by ID, name or class number…"
                 value={search}
@@ -244,7 +253,7 @@ const Students = () => {
         </CardContent>
       </Card>
 
-      {/* Create / Edit dialog */}
+      {/* Create / Edit dialog — uses Shadcn Dialog which already picks up CSS vars */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -278,6 +287,7 @@ const Students = () => {
               {editing && (
                 <div className="space-y-1.5">
                   <Label>Status</Label>
+                  {/* bg-transparent lets the dialog's bg-background show through */}
                   <select
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                     value={form.status}

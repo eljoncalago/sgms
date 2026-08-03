@@ -16,6 +16,9 @@
  *
  * NEW: Theme selector with 4 elegant themes (purple, midnight, amber, forest).
  * NEW: Per-component passing score inputs for the report card.
+ *
+ * THEME FIX: replaced hardcoded text-gray-400/500 with CSS variable equivalents
+ * so all hint text and table cell text respond to the active theme.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -205,7 +208,8 @@ const BrandingTab = ({ settings, update, saving, onSave }) => (
               onChange={(e) => update('SCHOOL_LOGO_URL', e.target.value)}
               placeholder="https://yourschool.com/logo.png"
             />
-            <p className="text-xs text-gray-400">
+            {/* THEME FIX: text-gray-400 → text-[var(--muted-foreground)] */}
+            <p className="text-xs text-[var(--muted-foreground)]">
               Host your logo image publicly (e.g. in Google Drive with sharing set to "Anyone with link") and paste the direct URL here.
             </p>
             {settings?.SCHOOL_LOGO_URL && (
@@ -226,7 +230,8 @@ const BrandingTab = ({ settings, update, saving, onSave }) => (
               onChange={(e) => update('SCHOOL_IMAGE_URL', e.target.value)}
               placeholder="https://yourschool.com/school.jpg"
             />
-            <p className="text-xs text-gray-400">Displayed on the Login screen and Dashboard header.</p>
+            {/* THEME FIX: text-gray-400 → text-[var(--muted-foreground)] */}
+            <p className="text-xs text-[var(--muted-foreground)]">Displayed on the Login screen and Dashboard header.</p>
           </div>
         </div>
       </CardContent>
@@ -421,7 +426,8 @@ const CalculationTab = ({ settings, update, saving, onSave }) => (
             onChange={(e) => update('PRINT_TEMPLATE_ID', e.target.value)}
             placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
           />
-          <p className="text-xs text-gray-400">
+          {/* THEME FIX: text-gray-400 → text-[var(--muted-foreground)] */}
+          <p className="text-xs text-[var(--muted-foreground)]">
             The ID portion of your Excel template's Google Drive URL.
             Found at: drive.google.com/file/d/<strong>[THIS_PART]</strong>/view
           </p>
@@ -526,11 +532,13 @@ const SecurityTab = ({ pw, setPw, savingPw, onChangePassword, admins, admin,
                         <Badge variant="secondary" className="ml-2 text-xs">You</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500">
+                    {/* THEME FIX: text-gray-500 → text-[var(--muted-foreground)] */}
+                    <TableCell className="text-xs text-[var(--muted-foreground)]">
                       {a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'}
                     </TableCell>
                     <TableCell>
-                      <Badge className={a.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}>
+                      {/* Active = semantic green (kept); Disabled = theme muted */}
+                      <Badge className={a.isActive ? 'bg-green-100 text-green-800' : 'bg-[var(--muted)] text-[var(--muted-foreground)]'}>
                         {a.isActive ? 'Active' : 'Disabled'}
                       </Badge>
                     </TableCell>

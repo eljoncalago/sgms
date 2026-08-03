@@ -10,6 +10,7 @@ import { GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 
 // FIX: removed erroneous backslash-escaping of quotes that caused JSX parse errors.
+// THEME FIX: replaced hardcoded blue colours with CSS variable equivalents.
 
 const Login = () => {
   const [adminName, setAdminName] = useState('');
@@ -41,12 +42,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    // THEME FIX: background uses theme variables instead of hardcoded blue
+    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-blue-600 rounded-full">
-              <GraduationCap className="w-12 h-12 text-white" />
+            {/* THEME FIX: icon circle uses theme primary colour */}
+            <div className="p-3 bg-[var(--primary)] rounded-full">
+              <GraduationCap className="w-12 h-12 text-[var(--primary-foreground)]" />
             </div>
           </div>
           <CardTitle className="text-3xl font-bold">SGMS</CardTitle>
@@ -99,8 +102,9 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800 text-center">
+          {/* THEME FIX: hint box uses secondary/muted theme colours */}
+          <div className="mt-6 p-3 bg-[var(--secondary)] rounded-lg">
+            <p className="text-sm text-[var(--secondary-foreground)] text-center">
               <strong>Default Credentials:</strong><br />
               Username: admin | Password: admin123
             </p>

@@ -15,6 +15,10 @@
  *
  * FIX: printAPI.generate now requires templateId as a third argument so the
  * backend can open the template file from Google Drive.
+ *
+ * THEME FIX: replaced all hardcoded Tailwind colour classes (blue-*, gray-*)
+ * with CSS variable equivalents so they respond to the active theme.
+ * Native <select> elements now carry explicit bg/text/border CSS-var classes.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -171,7 +175,7 @@ const PrintReports = () => {
                 onChange={(e) => setTemplateId(e.target.value)}
                 placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
               />
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-[var(--muted-foreground)]">
                 Found in the Google Drive URL: drive.google.com/file/d/<strong>[THIS_PART]</strong>/view
               </p>
             </div>
@@ -179,10 +183,11 @@ const PrintReports = () => {
             {/* Grade Level */}
             <div className="space-y-2">
               <Label>Grade Level (Mathayom)</Label>
+              {/* THEME FIX: explicit bg/text/border CSS-var classes on native select */}
               <select
                 value={gradeLevel}
                 onChange={(e) => setGradeLevel(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               >
                 <option value="">Select grade</option>
                 {GRADE_LEVELS.map((g) => (
@@ -194,10 +199,11 @@ const PrintReports = () => {
             {/* Section */}
             <div className="space-y-2">
               <Label>Section</Label>
+              {/* THEME FIX: explicit bg/text/border CSS-var classes on native select */}
               <select
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               >
                 <option value="">Select section</option>
                 {SECTIONS.map((s) => (
@@ -216,12 +222,12 @@ const PrintReports = () => {
                     onClick={() => setStage(s.value)}
                     className={`text-left border rounded-lg p-3 transition-colors ${
                       stage === s.value
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[var(--primary)] bg-[var(--accent)] text-[var(--accent-foreground)]'
+                        : 'border-[var(--border)] hover:border-[var(--primary)]'
                     }`}
                   >
                     <div className="font-medium text-sm">{s.label}</div>
-                    <div className="text-xs text-gray-500 mt-1">{s.description}</div>
+                    <div className="text-xs text-[var(--muted-foreground)] mt-1">{s.description}</div>
                   </button>
                 ))}
               </div>
@@ -282,7 +288,7 @@ const PrintReports = () => {
                           onClick={(e) => e.stopPropagation()}
                         />
                       </TableCell>
-                      <TableCell className="text-xs text-gray-500">{s.STUDENT_ID}</TableCell>
+                      <TableCell className="text-xs text-[var(--muted-foreground)]">{s.STUDENT_ID}</TableCell>
                       <TableCell className="font-medium">{s.ENGLISH_NAME}</TableCell>
                       <TableCell>{s.THAI_NAME}</TableCell>
                       <TableCell>{s.CLASS_NUMBER}</TableCell>
@@ -322,13 +328,13 @@ const PrintReports = () => {
                 href={result.data.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block mt-1 text-blue-600 underline text-sm"
+                className="inline-block mt-1 text-[var(--primary)] underline text-sm"
               >
                 Open Generated Report
               </a>
             )}
             {result.data?.message && (
-              <div className="text-sm text-gray-600">{result.data.message}</div>
+              <div className="text-sm text-[var(--muted-foreground)]">{result.data.message}</div>
             )}
           </AlertDescription>
         </Alert>

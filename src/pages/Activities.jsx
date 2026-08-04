@@ -7,6 +7,9 @@
  *   that different grade levels have independent activity sets.
  *   The activity list shows a grade level filter so you see only activities
  *   for the grade you're working on.
+ *
+ * THEME FIX: replaced all hardcoded Tailwind colour classes (gray-*, indigo-*,
+ *   amber-*) with CSS variable equivalents so they respond to the active theme.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -289,7 +292,7 @@ const Activities = () => {
                             onClick={() => saveTerm(t.TERM_ID)}
                             disabled={savingTermId === t.TERM_ID}
                           >
-                            {savingTermId === t.TERM_ID && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                            {savingTermId === t.TERM_ID && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
                             Save
                           </Button>
                         </TableCell>
@@ -305,9 +308,9 @@ const Activities = () => {
 
       {/* Activities */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Activities</CardTitle>
-          <Button onClick={openCreateActivity} disabled={!activeTerm}>
+          <Button onClick={openCreateActivity} disabled={!activeTerm || loading}>
             <Plus className="w-4 h-4 mr-2" /> Add Activity
           </Button>
         </CardHeader>
@@ -329,9 +332,10 @@ const Activities = () => {
           )}
 
           {/* Grade level filter */}
+          {/* THEME FIX: replaced text-gray-600 with text-[var(--muted-foreground)] */}
           {!loading && (
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <span className="text-sm font-medium text-gray-600">Grade:</span>
+              <span className="text-sm font-medium text-[var(--muted-foreground)]">Grade:</span>
               <Button
                 size="sm"
                 variant={gradeFilter === '' ? 'default' : 'outline'}
@@ -352,8 +356,9 @@ const Activities = () => {
             </div>
           )}
 
+          {/* THEME FIX: replaced bg-amber-50 border-amber-200 text-gray-500 with CSS variable equivalents */}
           {gradeFilter && (
-            <p className="text-xs text-gray-500 mb-3 rounded-md bg-amber-50 border border-amber-200 p-2">
+            <p className="text-xs text-[var(--muted-foreground)] mb-3 rounded-md bg-[var(--muted)] border border-[var(--border)] p-2">
               Showing activities for <strong>Grade {gradeFilter}</strong> + activities assigned to all grades.
               Activities with a specific grade only count for students in that grade.
             </p>
@@ -398,12 +403,15 @@ const Activities = () => {
                       </TableCell>
                       <TableCell>{a.MAX_SCORE}</TableCell>
                       <TableCell>
+                        {/* THEME FIX: replaced bg-indigo-100 text-indigo-800 with CSS variable equivalents */}
                         {a.GRADE_LEVEL ? (
-                          <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">
+                          <Badge
+                            className="bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]"
+                          >
                             Grade {a.GRADE_LEVEL}
                           </Badge>
                         ) : (
-                          <span className="text-xs text-gray-400">All Grades</span>
+                          <span className="text-xs text-[var(--muted-foreground)]">All Grades</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -415,7 +423,7 @@ const Activities = () => {
                             <Pencil className="w-4 h-4" />
                           </Button>
                           <Button size="icon" variant="ghost" onClick={() => setDeleteTarget(a)}>
-                            <Trash2 className="w-4 h-4 text-red-600" />
+                            <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -449,8 +457,9 @@ const Activities = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
+              {/* THEME FIX: replaced bg-transparent with explicit CSS variable background/text */}
               <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 value={actForm.activityType}
                 onChange={(e) => setActForm({ ...actForm, activityType: e.target.value })}
               >
@@ -472,8 +481,9 @@ const Activities = () => {
             </div>
             <div className="space-y-1.5">
               <Label>Grade Level</Label>
+              {/* THEME FIX: replaced bg-transparent with explicit CSS variable background/text */}
               <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 value={actForm.gradeLevel}
                 onChange={(e) => setActForm({ ...actForm, gradeLevel: e.target.value })}
               >
@@ -482,7 +492,8 @@ const Activities = () => {
                   <option key={g} value={g}>Grade {g}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400">
+              {/* THEME FIX: replaced text-gray-400 with text-[var(--muted-foreground)] */}
+              <p className="text-xs text-[var(--muted-foreground)]">
                 Leave as "All Grades" for activities shared across every grade.
                 Set a specific grade to create grade-level-specific activities
                 that only count for students in that grade.

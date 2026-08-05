@@ -142,10 +142,22 @@ const StudentGradeDialog = ({
   }, [open, studentId, load]);
 
   // ── Live (client-side) recalculation while typing ─────────────────────────
+  // FIX: only show activities that apply to this student's grade level.
+  //      An activity with no GRADE_LEVEL is shared across all grades; an
+  //      activity with a specific GRADE_LEVEL only applies to that grade.
+  const studentGradeLevel = String(student?.GRADE_LEVEL || '').trim();
+  const gradeApplicableActivities = useMemo(
+    () => activities.filter((a) => {
+      const actGrade = String(a.GRADE_LEVEL || '').trim();
+      return actGrade === '' || actGrade === studentGradeLevel;
+    }),
+    [activities, studentGradeLevel]
+  );
+
   const termRows = useMemo(() => {
     const sortedTerms = [...terms].sort((a, b) => Number(a.TERM_ORDER) - Number(b.TERM_ORDER));
     return sortedTerms.map((term) => {
-      const termActivities = activities
+      const termActivities = gradeApplicableActivities
         .filter((a) => a.TERM_ID === term.TERM_ID && isActivityActive(a))
         .sort((a, b) => Number(a.ACTIVITY_ORDER) - Number(b.ACTIVITY_ORDER));
 
@@ -174,7 +186,7 @@ const StudentGradeDialog = ({
         passed: percentage >= passing,
       };
     });
-  }, [terms, activities, draft]);
+  }, [terms, gradeApplicableActivities, draft]);
 
   const finalGrade = useMemo(
     () => round2(termRows.reduce((sum, r) => sum + r.weighted, 0)),
@@ -196,14 +208,14 @@ const StudentGradeDialog = ({
 
   const invalidCount = useMemo(() => {
     let bad = 0;
-    activities.forEach((a) => {
+    gradeApplicableActivities.forEach((a) => {
       const val = draft[a.ACTIVITY_ID];
       if (val === '' || val === undefined) return;
       const num = Number(val);
       if (Number.isNaN(num) || num < 0 || num > Number(a.MAX_SCORE)) bad++;
     });
     return bad;
-  }, [draft, activities]);
+  }, [draft, gradeApplicableActivities]);
 
   // ── Saving ────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async (silent = false) => {

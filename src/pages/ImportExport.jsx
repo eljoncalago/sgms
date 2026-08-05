@@ -167,8 +167,9 @@ const ImportStudentsTab = () => {
           <p className="text-sm text-gray-500 mb-3">
             Download the Excel (.xlsx) template, fill in your student data — you can edit it
             in Excel or upload it to Google Drive and edit as a Google Sheet — then download it
-            as .xlsx and upload it below. Leave STUDENT_ID blank — the system generates it
-            automatically.
+            as .xlsx and upload it below. Enter the student's existing STUDENT_ID in the
+            STUDENT_ID column — the system keeps it exactly as written. Leave it blank only for
+            brand-new students with no assigned ID, and the system will generate one.
           </p>
           <Button variant="outline" onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-2" />

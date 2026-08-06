@@ -245,15 +245,16 @@ export const reportsAPI = {
 // ── Print Reports ─────────────────────────────────────────────────────────────
 export const printAPI = {
   /**
-   * FIX: Now accepts templateId as a third parameter and forwards it to the
-   * backend. The backend (PrintService.gs handleGeneratePrintReport) reads
-   * payload.templateId to open the Google Drive template file. Without this,
-   * every print request returned "Template file ID is required".
+   * Refactor 2: now accepts batchIndex, totalBatches, and workbookId so the
+   * frontend can stream students in small batches. The backend reuses one
+   * accumulating workbook (workbookId) across batches and only exports the
+   * final PDF on the last batch — keeping every call short enough to avoid
+   * the Apps Script timeout that disconnected large (~400-student) runs.
    */
-  generate: async (studentIds, stage, templateId) => {
+  generate: async (studentIds, stage, templateId, batchIndex, totalBatches, workbookId) => {
     return await makeRequest(
       'generatePrintReport',
-      { studentIds, stage, templateId },
+      { studentIds, stage, templateId, batchIndex, totalBatches, workbookId },
       getToken()
     );
   },

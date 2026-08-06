@@ -10,15 +10,13 @@
  *  5. Click Generate → triggers PrintService.gs → backend fills the template.
  *  6. Result shows download URL or status message.
  *
- * Note: PrintService.gs requires a properly formatted Excel template to exist
- * in Google Drive. See INSTALLATION_GUIDE.md → PrintService setup.
+ * Refactor 1: one student per A4 page (Student 2 removed) — handled backend-side.
+ * Refactor 2: students are sent in small BATCHES (25 per request) with a live
+ *  progress bar, so a ~400-student run finishes instead of disconnecting at
+ *  the Apps Script ~6-min ceiling. One accumulating workbook is reused across
+ *  batches (workbookId) and the final PDF is produced on the last batch.
  *
- * FIX: printAPI.generate now requires templateId as a third argument so the
- * backend can open the template file from Google Drive.
- *
- * THEME FIX: replaced all hardcoded Tailwind colour classes (blue-*, gray-*)
- * with CSS variable equivalents so they respond to the active theme.
- * Native <select> elements now carry explicit bg/text/border CSS-var classes.
+ * THEME FIX: CSS variable classes used throughout so they respond to the theme.
  */
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +41,9 @@ import { toast } from 'sonner';
 const GRADE_LEVELS = [1, 2, 3, 4, 5, 6];
 const SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+// Refactor 2: keep each Apps Script call short so it never hits the timeout.
+const BATCH_SIZE = 25;
+
 const STAGES = [
   { value: '1', label: 'Stage 1', description: 'Midterm Collective + Midterm Exam' },
   { value: '2', label: 'Stage 2', description: 'Stage 1 + Final Collective Initial' },
@@ -65,6 +66,7 @@ const PrintReports = () => {
   // State
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [progress, setProgress] = useState(null);
 
   // Load template ID from settings on mount
   useEffect(() => {
@@ -126,22 +128,68 @@ const PrintReports = () => {
 
     setGenerating(true);
     setResult(null);
+    setProgress({ current: 0, total: 0, studentsDone: 0, totalStudents: selected.size });
 
-    // FIX: pass templateId as the third argument so the backend can open the file
-    const res = await printAPI.generate(
-      Array.from(selected),
-      Number(stage),
-      templateId
-    );
+    // Chunk selected students into batches so each request stays short.
+    const allIds = Array.from(selected);
+    const batches = [];
+    for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+      batches.push(allIds.slice(i, i + BATCH_SIZE));
+    }
+    const totalBatches = batches.length;
+
+    let workbookId = null;
+    let totalProcessed = 0;
+    let allErrors = [];
+    let lastRes = null;
+    let failed = null;
+
+    for (let bi = 0; bi < totalBatches; bi++) {
+      setProgress({
+        current: bi + 1,
+        total: totalBatches,
+        studentsDone: totalProcessed,
+        totalStudents: allIds.length,
+      });
+
+      const res = await printAPI.generate(
+        batches[bi],
+        Number(stage),
+        templateId,
+        bi,
+        totalBatches,
+        workbookId
+      );
+
+      if (!res.success) {
+        failed = res;
+        break;
+      }
+
+      lastRes = res;
+      totalProcessed += res.data?.processed || 0;
+      if (res.data?.errors?.length) allErrors = allErrors.concat(res.data.errors);
+      workbookId = res.data?.workbookId || workbookId;
+    }
 
     setGenerating(false);
-    if (res.success) {
-      setResult({ type: 'success', data: res.data, message: res.message });
-      toast.success(res.message || 'Report generated');
-    } else {
-      setResult({ type: 'error', message: res.message });
-      toast.error(res.message || 'Generation failed');
+    setProgress(null);
+
+    if (failed) {
+      const partial = totalProcessed > 0 ? ` (stopped after ${totalProcessed} students)` : '';
+      setResult({ type: 'error', message: (failed.message || 'Generation failed') + partial });
+      toast.error(failed.message || 'Generation failed');
+      return;
     }
+
+    const pdfUrl = lastRes?.data?.pdfUrl || lastRes?.data?.fileUrl;
+    const sheetUrl = lastRes?.data?.spreadsheetUrl;
+    setResult({
+      type: 'success',
+      data: { fileUrl: pdfUrl, spreadsheetUrl: sheetUrl, processed: totalProcessed, errors: allErrors },
+      message: lastRes?.message || `Report cards generated for ${totalProcessed} students`,
+    });
+    toast.success(lastRes?.message || 'Report generated');
   };
 
   return (
@@ -183,7 +231,6 @@ const PrintReports = () => {
             {/* Grade Level */}
             <div className="space-y-2">
               <Label>Grade Level (Mathayom)</Label>
-              {/* THEME FIX: explicit bg/text/border CSS-var classes on native select */}
               <select
                 value={gradeLevel}
                 onChange={(e) => setGradeLevel(e.target.value)}
@@ -199,7 +246,6 @@ const PrintReports = () => {
             {/* Section */}
             <div className="space-y-2">
               <Label>Section</Label>
-              {/* THEME FIX: explicit bg/text/border CSS-var classes on native select */}
               <select
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
@@ -315,6 +361,38 @@ const PrintReports = () => {
         </Card>
       )}
 
+      {/* Batch progress (Refactor 2) */}
+      {generating && progress && (
+        <Card>
+          <CardContent className="pt-6 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating… Batch {progress.current} of {progress.total || 1}
+              </span>
+              <span className="text-[var(--muted-foreground)]">
+                {progress.studentsDone} / {progress.totalStudents} students
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-[var(--muted)] overflow-hidden">
+              <div
+                className="h-full bg-[var(--primary)] transition-all"
+                style={{
+                  width: `${
+                    progress.total
+                      ? (progress.current / progress.total) * 100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Each batch is a short separate request so the connection stays alive for the full run.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Result */}
       {result && (
         <Alert variant={result.type === 'success' ? 'default' : 'destructive'}>
@@ -325,12 +403,22 @@ const PrintReports = () => {
             <div>{result.message}</div>
             {result.data?.fileUrl && (
               <a
-                href={result.data.fileUrl}
+                href__={result.data.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-1 text-[var(--primary)] underline text-sm"
               >
                 Open Generated Report
+              </a>
+            )}
+            {result.data?.spreadsheetUrl && (
+              <a
+                href__={result.data.spreadsheetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-1 ml-2 text-[var(--primary)] underline text-sm"
+              >
+                Open Spreadsheet
               </a>
             )}
             {result.data?.message && (

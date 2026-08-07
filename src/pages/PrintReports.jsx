@@ -8,13 +8,11 @@
  *  3. Select students (multi-select).
  *  4. Choose semester stage (1–4).
  *  5. Click Generate → triggers PrintService.gs → backend fills the template.
- *  6. Result shows download URL or status message.
+ *  6. Result shows download links for each PDF part and the full workbook.
  *
  * Refactor 1: one student per A4 page (Student 2 removed) — handled backend-side.
- * Refactor 2: students are sent in small BATCHES (25 per request) with a live
- *  progress bar, so a ~400-student run finishes instead of disconnecting at
- *  the Apps Script ~6-min ceiling. One accumulating workbook is reused across
- *  batches (workbookId) and the final PDF is produced on the last batch.
+ * Refactor 2: students are sent in small BATCHES with a live progress bar.
+ * Each batch gets its own PDF part while one workbook accumulates every page.
  *
  * THEME FIX: CSS variable classes used throughout so they respond to the theme.
  */
@@ -41,8 +39,9 @@ import { toast } from 'sonner';
 const GRADE_LEVELS = [1, 2, 3, 4, 5, 6];
 const SECTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-// Refactor 2: keep each Apps Script call short so it never hits the timeout.
+// Keep each Apps Script call short so it never hits the timeout.
 const BATCH_SIZE = 25;
+const MAX_BATCH_RETRIES = 3;
 
 const STAGES = [
   { value: '1', label: 'Stage 1', description: 'Midterm Collective + Midterm Exam' },
@@ -116,6 +115,40 @@ const PrintReports = () => {
     else setSelected(new Set(students.map((s) => s.STUDENT_ID)));
   };
 
+  const makeJobId = () => {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return `print-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  };
+
+  const isRetryable = (res) => {
+    if (res?.retryable) return true;
+    const message = String(res?.message || '').toLowerCase();
+    return [
+      'network',
+      'failed to fetch',
+      'timeout',
+      'timed out',
+      'disconnect',
+      'temporarily',
+      'service unavailable',
+      'server error',
+    ].some((term) => message.includes(term));
+  };
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const generateBatchWithRetry = async (args) => {
+    let lastResponse = null;
+    for (let attempt = 1; attempt <= MAX_BATCH_RETRIES; attempt += 1) {
+      lastResponse = await printAPI.generate(...args);
+      if (lastResponse.success || !isRetryable(lastResponse) || attempt === MAX_BATCH_RETRIES) {
+        return lastResponse;
+      }
+      await sleep(attempt * 1500);
+    }
+    return lastResponse;
+  };
+
   const handleGenerate = async () => {
     if (selected.size === 0) {
       toast.warning('Please select at least one student');
@@ -137,10 +170,12 @@ const PrintReports = () => {
       batches.push(allIds.slice(i, i + BATCH_SIZE));
     }
     const totalBatches = batches.length;
+    const jobId = makeJobId();
 
     let workbookId = null;
     let totalProcessed = 0;
     let allErrors = [];
+    let pdfParts = [];
     let lastRes = null;
     let failed = null;
 
@@ -152,14 +187,16 @@ const PrintReports = () => {
         totalStudents: allIds.length,
       });
 
-      const res = await printAPI.generate(
+      const res = await generateBatchWithRetry([
         batches[bi],
         Number(stage),
         templateId,
         bi,
         totalBatches,
-        workbookId
-      );
+        workbookId,
+        jobId,
+        bi * BATCH_SIZE,
+      ]);
 
       if (!res.success) {
         failed = res;
@@ -170,6 +207,19 @@ const PrintReports = () => {
       totalProcessed += res.data?.processed || 0;
       if (res.data?.errors?.length) allErrors = allErrors.concat(res.data.errors);
       workbookId = res.data?.workbookId || workbookId;
+      if (res.data?.pdfParts?.length) {
+        pdfParts = pdfParts.concat(
+          res.data.pdfParts.filter((part) => !pdfParts.some((existing) => existing.url === part.url))
+        );
+      } else if (res.data?.pdfPart) {
+        pdfParts.push(res.data.pdfPart);
+      }
+      setProgress({
+        current: bi + 1,
+        total: totalBatches,
+        studentsDone: totalProcessed,
+        totalStudents: allIds.length,
+      });
     }
 
     setGenerating(false);
@@ -186,10 +236,16 @@ const PrintReports = () => {
     const sheetUrl = lastRes?.data?.spreadsheetUrl;
     setResult({
       type: 'success',
-      data: { fileUrl: pdfUrl, spreadsheetUrl: sheetUrl, processed: totalProcessed, errors: allErrors },
-      message: lastRes?.message || `Report cards generated for ${totalProcessed} students`,
+      data: {
+        fileUrl: pdfUrl,
+        pdfParts,
+        spreadsheetUrl: sheetUrl,
+        processed: totalProcessed,
+        errors: allErrors,
+      },
+      message: `Report cards generated for ${totalProcessed} student${totalProcessed === 1 ? '' : 's'}`
     });
-    toast.success(lastRes?.message || 'Report generated');
+    toast.success(`Report cards generated for ${totalProcessed} student${totalProcessed === 1 ? '' : 's'}`);
   };
 
   return (
@@ -361,7 +417,7 @@ const PrintReports = () => {
         </Card>
       )}
 
-      {/* Batch progress (Refactor 2) */}
+      {/* Batch progress */}
       {generating && progress && (
         <Card>
           <CardContent className="pt-6 space-y-2">
@@ -387,7 +443,7 @@ const PrintReports = () => {
               />
             </div>
             <p className="text-xs text-[var(--muted-foreground)]">
-              Each batch is a short separate request so the connection stays alive for the full run.
+              Each batch is a short separate request. If the connection drops, the same batch is retried safely.
             </p>
           </CardContent>
         </Card>
@@ -401,9 +457,25 @@ const PrintReports = () => {
             : <Info className="w-4 h-4" />}
           <AlertDescription className="space-y-2">
             <div>{result.message}</div>
-            {result.data?.fileUrl && (
+            {result.data?.pdfParts?.length > 0 ? (
+              <div className="space-y-1">
+                <div className="text-sm font-medium">PDF report parts</div>
+                {result.data.pdfParts.map((part, index) => (
+                  <a
+                    key={`${part.url}-${index}`}
+                    href={part.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-[var(--primary)] underline text-sm"
+                  >
+                    Open Report Part {part.part || index + 1}
+                    {part.processed ? ` (${part.processed} students)` : ''}
+                  </a>
+                ))}
+              </div>
+            ) : result.data?.fileUrl && (
               <a
-                href__={result.data.fileUrl}
+                href={result.data.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-1 text-[var(--primary)] underline text-sm"
@@ -413,7 +485,7 @@ const PrintReports = () => {
             )}
             {result.data?.spreadsheetUrl && (
               <a
-                href__={result.data.spreadsheetUrl}
+                href={result.data.spreadsheetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-1 ml-2 text-[var(--primary)] underline text-sm"

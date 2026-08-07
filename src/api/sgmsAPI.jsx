@@ -16,8 +16,8 @@
  *    cleared so the next navigation redirects to /login.
  *  - FIX: scoresAPI.getAll added (ScoreEntry.jsx calls it with activityId filter).
  *  - FIX: importExportAPI.importStudents now accepts (students, mode) as two params.
- *  - FIX: printAPI.generate now accepts templateId as a third parameter and
- *         forwards it to the backend so PrintService.gs can open the template file.
+ *  - printAPI.generate forwards batch/job metadata so a dropped request can be
+ *    retried without duplicating a completed batch.
  */
 
 const APPS_SCRIPT_URL =
@@ -27,6 +27,8 @@ const APPS_SCRIPT_URL =
  * Make API request to Google Apps Script
  */
 async function makeRequest(action, payload = {}, token = null) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 180000);
   try {
     const requestBody = { action, payload, token };
 
@@ -34,6 +36,7 @@ async function makeRequest(action, payload = {}, token = null) {
       method: 'POST',
       mode: 'cors',
       redirect: 'follow',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
       },
@@ -62,9 +65,14 @@ async function makeRequest(action, payload = {}, token = null) {
     console.error('API Request Error:', error);
     return {
       success: false,
-      message: error.message || 'Network error',
+      message: error.name === 'AbortError'
+        ? 'The request timed out. It can be safely retried.'
+        : error.message || 'Network error',
       data: null,
+      retryable: true,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -245,16 +253,31 @@ export const reportsAPI = {
 // ── Print Reports ─────────────────────────────────────────────────────────────
 export const printAPI = {
   /**
-   * Refactor 2: now accepts batchIndex, totalBatches, and workbookId so the
-   * frontend can stream students in small batches. The backend reuses one
-   * accumulating workbook (workbookId) across batches and only exports the
-   * final PDF on the last batch — keeping every call short enough to avoid
-   * the Apps Script timeout that disconnected large (~400-student) runs.
+   * Batch/job metadata makes the request resumable. The backend records a
+   * completed batch and returns the same result if the browser retries it.
    */
-  generate: async (studentIds, stage, templateId, batchIndex, totalBatches, workbookId) => {
+  generate: async (
+    studentIds,
+    stage,
+    templateId,
+    batchIndex,
+    totalBatches,
+    workbookId,
+    jobId,
+    startIndex
+  ) => {
     return await makeRequest(
       'generatePrintReport',
-      { studentIds, stage, templateId, batchIndex, totalBatches, workbookId },
+      {
+        studentIds,
+        stage,
+        templateId,
+        batchIndex,
+        totalBatches,
+        workbookId,
+        jobId,
+        startIndex,
+      },
       getToken()
     );
   },
